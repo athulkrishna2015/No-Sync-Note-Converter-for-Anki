@@ -1,0 +1,21 @@
+{
+    "toggle_strip_cloze": true,
+    "mappings": {
+        "Basic->Cloze": {
+            "source_type": "Basic",
+            "target_type": "Cloze",
+            "field_map": {
+                "Text": ["Front", "Back"],
+                "Extra": ["Extra"]
+            }
+        },
+        "Cloze->Basic": {
+            "source_type": "Cloze",
+            "target_type": "Basic",
+            "field_map": {
+                "Front": ["Text"],
+                "Back": ["Extra"]
+            }
+        }
+    }
+}
