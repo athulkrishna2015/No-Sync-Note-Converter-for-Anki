@@ -1,8 +1,4 @@
-Here is the updated `README.md` reflecting the new Reviewer context menu features and the fixes for modern Anki versions.
-
----
-
-# No-Sync Note Converter for Anki
+# [No-Sync Note Converter for Anki](https://github.com/athulkrishna2015/No-Sync-Note-Converter-for-Anki/)
 
 **No-Sync Note Converter** is an Anki addon designed to change note types (e.g., Basic → Cloze) without triggering the "Full Sync Required" on AnkiWeb.
 
@@ -18,7 +14,7 @@ It bypasses the database schema change by performing a **"Create New → Delete 
 
 ## Installation
 
-Install via AnkiWeb: [No-Sync Note Converter](https://ankiweb.net/shared/info/1234567890) (replace with actual link)
+Install via AnkiWeb: [No-Sync Note Converter](https://ankiweb.net/shared/info/415704549)
 
 5. Restart Anki.
 
