@@ -7,42 +7,15 @@ It bypasses the database schema change by performing a **"Create New → Delete 
 ## Features
 
 * **Zero-Sync Overhead:** Converts notes without triggering a full database upload.
+* **Field Mapping GUI:** A new interactive dialog allows you to map fields between note types on the fly. No more lost data in "Extra" fields!
 * **Reviewer Integration:** Convert cards directly while reviewing. The addon will automatically skip to the next card and open a window to edit the new card (perfect for creating Clozes on the fly).
-* **Smart Field Mapping:** Merges multiple fields (e.g., Front + Back) into a single destination field based on your config.
+* **Smart Field Mapping:** Automatically suggests logical mappings (e.g., "Text" -> "Front", "Extra" -> "Back") while allowing full manual control.
 * **Cloze Stripping:** Option to automatically strip `{{c1::...}}` syntax when converting from Cloze to Basic.
 * **Deck & Tag Preservation:** The new card stays in the exact same sub-deck and retains all tags.
 
 ## Installation
 
 Install via AnkiWeb: [No-Sync Note Converter](https://ankiweb.net/shared/info/415704549)
-
-5. Restart Anki.
-
-## Configuration (`config.json`)
-
-You can customize how fields are merged in `config.json`.
-
-### Options
-
-* `toggle_strip_cloze`: (`true`/`false`) If true, removes `{{c::}}` syntax when converting *from* a Cloze type *to* a Basic type.
-
-### Mappings
-
-Define rules for `SourceType -> TargetType`.
-
-**Example:** Converting **Basic** (Front, Back) to **Cloze** (Text, Extra):
-
-```json
-"Basic->Cloze": {
-    "source_type": "Basic",
-    "target_type": "Cloze",
-    "field_map": {
-        "Text": ["Front", "Back"],   // Merges Front and Back into Text
-        "Extra": ["Extra"]           // Moves Extra to Extra
-    }
-}
-
-```
 
 ## Usage
 
@@ -51,14 +24,41 @@ Define rules for `SourceType -> TargetType`.
 1. Select the notes you want to convert.
 2. Go to **Notes** > **No-Sync Convert Note Type**.
 3. Select the **Target Note Type**.
-4. The old notes are deleted, new ones created, and the editor sidebar will refresh to show the new notes.
+4. **Field Mapping Dialog:** A dialog will appear for each unique note type selected. Choose which source fields map to which target fields.
+5. The old notes are deleted, new ones created, and the editor sidebar will refresh to show the new notes.
 
 ### 2. In the Reviewer (Single Card Mode)
 
 1. While reviewing a card, **Right-Click** (or click the **More** button).
 2. Select **No-Sync Convert Note Type**.
 3. Choose the Target Note Type.
-4. **Action:** The current card is converted and deleted. Anki will immediately move you to the **Next Card**, and a separate **Browser Window** will open focused on the new card so you can edit it (e.g., to add Cloze deletions).
+4. **Field Mapping Dialog:** Map the fields for the current note.
+5. **Action:** The current card is converted and deleted. Anki will immediately move you to the **Next Card**, and a separate **Browser Window** will open focused on the new card so you can edit it (e.g., to add Cloze deletions).
+
+## Configuration (`config.json`)
+
+You can customize the default behavior in `config.json`.
+
+### Options
+
+* `toggle_strip_cloze`: (`true`/`false`) If true, removes `{{c::}}` syntax when converting *from* a Cloze type *to* a Basic type.
+
+### Mappings (Advanced)
+
+While the GUI handles most cases, you can still define permanent rules for `SourceType -> TargetType` in `config.json`. These will be used as the default selections in the mapping dialog.
+
+**Example:**
+
+```json
+"Cloze->Basic": {
+    "source_type": "Cloze",
+    "target_type": "Basic",
+    "field_map": {
+        "Front": ["Text"],
+        "Back": ["Extra"]
+    }
+}
+```
 
 ## ⚠️ Important Limitations
 

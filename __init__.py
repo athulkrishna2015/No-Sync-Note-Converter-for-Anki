@@ -34,7 +34,82 @@ def get_target_model(parent_window):
         return mw.col.models.by_name(target_model_name)
     return None
 
-def core_convert_logic(nids, target_model):
+class FieldMappingDialog(QDialog):
+    def __init__(self, parent, old_model, target_model, current_mapping=None):
+        super().__init__(parent)
+        self.old_model = old_model
+        self.target_model = target_model
+        self.mapping = current_mapping or {}
+        self.setWindowTitle("Map Fields")
+        self.setMinimumWidth(400)
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+
+        label = QLabel(f"Mapping from <b>{self.old_model['name']}</b> to <b>{self.target_model['name']}</b>")
+        layout.addWidget(label)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll_content = QWidget()
+        scroll_layout = QGridLayout(scroll_content)
+        scroll.setWidget(scroll_content)
+        layout.addWidget(scroll)
+
+        self.combos = {}
+        old_fields = [f['name'] for f in self.old_model['flds']]
+        target_fields = [f['name'] for f in self.target_model['flds']]
+
+        for i, tf in enumerate(target_fields):
+            scroll_layout.addWidget(QLabel(tf), i, 0)
+            
+            combo = QComboBox()
+            combo.addItem("(None)", None)
+            for sf in old_fields:
+                combo.addItem(sf, sf)
+            
+            # Default mapping
+            if tf in self.mapping:
+                # current_mapping is expected to be { "Target": ["Source1", "Source2"] }
+                src = self.mapping[tf][0] if self.mapping[tf] else None
+                idx = combo.findData(src)
+                if idx != -1:
+                    combo.setCurrentIndex(idx)
+            else:
+                # Naive match
+                idx = combo.findText(tf, Qt.MatchFlag.MatchFixedString)
+                if idx == -1:
+                    # Try common names
+                    if tf == "Front" and "Text" in old_fields:
+                        idx = combo.findText("Text")
+                    elif tf == "Back":
+                        if "Extra" in old_fields:
+                            idx = combo.findText("Extra")
+                        elif "Back Extra" in old_fields:
+                            idx = combo.findText("Back Extra")
+                
+                if idx != -1:
+                    combo.setCurrentIndex(idx)
+            
+            scroll_layout.addWidget(combo, i, 1)
+            self.combos[tf] = combo
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def get_mapping(self):
+        m = {}
+        for tf, combo in self.combos.items():
+            sf = combo.currentData()
+            if sf:
+                m[tf] = [sf]
+        return m
+
+def core_convert_logic(nids, target_model, override_mapping=None):
     """
     Performs the actual Create New -> Delete Old logic.
     Returns a list of new Note IDs.
@@ -54,8 +129,11 @@ def core_convert_logic(nids, target_model):
             new_note = mw.col.new_note(target_model)
             
             # --- MAPPING LOGIC ---
-            map_key = f"{old_model_name}->{target_model_name}"
-            mapping = config['mappings'].get(map_key)
+            if override_mapping:
+                mapping = {'field_map': override_mapping}
+            else:
+                map_key = f"{old_model_name}->{target_model_name}"
+                mapping = config['mappings'].get(map_key)
             
             if mapping:
                 for target_field, source_fields in mapping['field_map'].items():
@@ -111,23 +189,46 @@ def on_browser_convert(browser):
     if not target_model:
         return
 
-    created_nids = core_convert_logic(nids, target_model)
+    # Group nids by their model
+    notes_by_mid = {}
+    for nid in nids:
+        note = mw.col.get_note(nid)
+        mid = note.mid
+        if mid not in notes_by_mid:
+            notes_by_mid[mid] = []
+        notes_by_mid[mid].append(nid)
+
+    all_created_nids = []
+    for mid, m_nids in notes_by_mid.items():
+        old_model = mw.col.models.get(mid)
+        
+        # Get existing mapping from config if available
+        map_key = f"{old_model['name']}->{target_model['name']}"
+        existing = config['mappings'].get(map_key, {}).get('field_map', {})
+        
+        diag = FieldMappingDialog(browser, old_model, target_model, existing)
+        if not diag.exec():
+            continue
+            
+        mapping = diag.get_mapping()
+        
+        created_nids = core_convert_logic(m_nids, target_model, override_mapping=mapping)
+        all_created_nids.extend(created_nids)
     
-    if created_nids:
+    if all_created_nids:
         mw.reset()
         
         # 1. Search for the new notes to filter the view
-        query = f"nid:{','.join(map(str, created_nids))}"
+        query = f"nid:{','.join(map(str, all_created_nids))}"
         browser.search_for(query)
         
         # 2. Force Selection so the Editor Sidebar populates
-        # Use selectAll() (Qt Standard) which works on QTableView
         try:
             browser.table.selectAll()
         except:
             pass # Fail silently if UI is in weird state
             
-        tooltip(f"Converted {len(created_nids)} notes.")
+        tooltip(f"Converted {len(all_created_nids)} notes.")
 
 def setup_browser_menu(browser):
     a = QAction("No-Sync Convert Note Type", browser)
@@ -146,17 +247,28 @@ def on_reviewer_convert(reviewer):
     if not target_model:
         return
 
-    # 2. Convert
-    created_nids = core_convert_logic([card.nid], target_model)
+    # 2. Show Mapping Dialog
+    old_note = card.note()
+    old_model = old_note.note_type()
+    map_key = f"{old_model['name']}->{target_model['name']}"
+    existing = config['mappings'].get(map_key, {}).get('field_map', {})
+    
+    diag = FieldMappingDialog(mw, old_model, target_model, existing)
+    if not diag.exec():
+        return
+        
+    mapping = diag.get_mapping()
 
-    # 3. Handle Reviewer Flow
+    # 3. Convert
+    created_nids = core_convert_logic([card.nid], target_model, override_mapping=mapping)
+
+    # 4. Handle Reviewer Flow
     if created_nids:
         # Move reviewer to next card FIRST (since old one is gone)
         reviewer.nextCard()
         mw.reset()
         
         # Open Browser to the NEW card so user can add Clozes
-        # FIX: Pass search as a LIST [query] to avoid unpacking chars
         query = f"nid:{created_nids[0]}"
         dialogs.open("Browser", mw, search=[query])
 
