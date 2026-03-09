@@ -29,6 +29,9 @@ Install via AnkiWeb: [No-Sync Note Converter](https://ankiweb.net/shared/info/41
 3. **Conversion Dialog:** A dialog will appear for each unique source note type selected. Choose the target note type at the top, then map fields with dropdown selectors below. You can add multiple source fields to one target field, and they will be merged in order.
 4. The old notes are deleted, new ones created, and the editor sidebar will refresh to show the new notes.
 
+<img width="863" height="722" alt="Screenshot_20260309_185829" src="https://github.com/user-attachments/assets/cf0c8df3-3738-42a9-bdca-edca7c3b6f33" />
+
+
 ### Quick Presets
 
 1. Open the conversion dialog for a source note type.
