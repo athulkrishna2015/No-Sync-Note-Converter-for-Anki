@@ -7,11 +7,14 @@ It bypasses the database schema change by performing a **"Create New → Delete 
 ## Features
 
 * **Zero-Sync Overhead:** Converts notes without triggering a full database upload.
-* **Field Mapping GUI:** A new interactive dialog allows you to map fields between note types on the fly. No more lost data in "Extra" fields!
+* **Unified Conversion Dialog:** Target note type selection and field mapping now happen in one window, with dropdown-based field mapping and ordered multi-field merges.
+* **Quick Convert Presets:** Save named source-to-target conversion presets from the dialog and reuse them from one-click quick convert menus that only appear for matching source note types.
+* **GUI Config Editor:** The Add-ons **Config** button opens a GUI for editing general settings, quick presets, and saved mappings without hand-editing JSON.
 * **Reviewer Integration:** Convert cards directly while reviewing. The addon will automatically skip to the next card and open a window to edit the new card (perfect for creating Clozes on the fly).
 * **Smart Field Mapping:** Automatically suggests logical mappings (e.g., "Text" -> "Front", "Extra" -> "Back") while allowing full manual control.
-* **Cloze Stripping:** Option to automatically strip `{{c1::...}}` syntax when converting from Cloze to Basic.
+* **Cloze Stripping:** Option to automatically strip `{{c1::...}}` syntax when converting from a Cloze note type to any non-Cloze note type.
 * **Deck & Tag Preservation:** The new card stays in the exact same sub-deck and retains all tags.
+* **Safe Failure Handling:** Conversions are validated before they run, and failed conversions are rolled back instead of leaving partially converted notes behind.
 
 ## Installation
 
@@ -23,17 +26,35 @@ Install via AnkiWeb: [No-Sync Note Converter](https://ankiweb.net/shared/info/41
 
 1. Select the notes you want to convert.
 2. Go to **Notes** > **No-Sync Convert Note Type**.
-3. Select the **Target Note Type**.
-4. **Field Mapping Dialog:** A dialog will appear for each unique note type selected. Choose which source fields map to which target fields.
-5. The old notes are deleted, new ones created, and the editor sidebar will refresh to show the new notes.
+3. **Conversion Dialog:** A dialog will appear for each unique source note type selected. Choose the target note type at the top, then map fields with dropdown selectors below. You can add multiple source fields to one target field, and they will be merged in order.
+4. The old notes are deleted, new ones created, and the editor sidebar will refresh to show the new notes.
+
+### Quick Presets
+
+1. Open the conversion dialog for a source note type.
+2. Configure the target note type and field mapping.
+3. Click **Save Quick Preset** and give the preset a custom name.
+4. The preset will use the current note type as its fixed source note type.
+5. Reuse it later from **Notes** > **No-Sync Quick Convert** in the browser, or from **No-Sync Quick Convert** in the reviewer context menu. Only presets that match the current source note type are shown.
+
+Preset customization:
+The preset name, target note type, and field mapping are customizable. The source note type is fixed automatically from the note type you created the preset from.
+
+### Config GUI
+
+1. Open **Tools** > **Add-ons**.
+2. Select **No-Sync Note Converter**.
+3. Click **Config**.
+4. Use the GUI tabs to edit the strip-cloze option, quick presets, and saved mappings.
+5. Add/Edit actions reuse the same conversion dialog UI, so field mapping stays consistent with normal conversion.
+6. In the config editor, source note type and target note type can both be changed directly inside the edit window. There is no separate source-selection popup.
 
 ### 2. In the Reviewer (Single Card Mode)
 
 1. While reviewing a card, **Right-Click** (or click the **More** button).
 2. Select **No-Sync Convert Note Type**.
-3. Choose the Target Note Type.
-4. **Field Mapping Dialog:** Map the fields for the current note.
-5. **Action:** The current card is converted and deleted. Anki will immediately move you to the **Next Card**, and a separate **Browser Window** will open focused on the new card so you can edit it (e.g., to add Cloze deletions).
+3. **Conversion Dialog:** Choose the target note type and map the fields in the same window. You can add multiple source fields to one target field, and they will be merged in order.
+4. **Action:** The current card is converted and deleted. Anki will immediately move you to the **Next Card**, and a separate **Browser Window** will open focused on the new card so you can edit it (e.g., to add Cloze deletions).
 
 ## Configuration (`config.json`)
 
@@ -41,13 +62,13 @@ You can customize the default behavior in `config.json`.
 
 ### Options
 
-* `toggle_strip_cloze`: (`true`/`false`) If true, removes `{{c::}}` syntax when converting *from* a Cloze type *to* a Basic type.
+* `toggle_strip_cloze`: (`true`/`false`) If true, removes `{{c::}}` syntax when converting *from* a Cloze note type *to* a non-Cloze note type.
 
 ### Mappings (Advanced)
 
-While the GUI handles most cases, you can still define permanent rules for `SourceType -> TargetType` in `config.json`. These will be used as the default selections in the mapping dialog.
+While the GUI handles most cases, you can still define permanent rules for `SourceType -> TargetType` in `config.json`. These will be used as the default selections in the conversion dialog.
 
-**Example:**
+**Mapping Example:**
 
 ```json
 "Cloze->Basic": {
@@ -60,10 +81,49 @@ While the GUI handles most cases, you can still define permanent rules for `Sour
 }
 ```
 
+### Quick Convert Presets (Advanced)
+
+Quick presets are stored in `quick_convert_presets` as named conversion rules that can be applied without reopening the dialog.
+Each preset has a fixed `source_type`, so a Cloze preset will not be shown for Basic notes, and a Basic preset will not be shown for Cloze notes.
+
+The shipped `config.json` provides defaults, but once you edit settings in Anki, the live addon config is stored by Anki in addon metadata.
+
+**Preset Example:**
+
+```json
+"quick_convert_presets": [
+    {
+        "name": "Basic to Cloze",
+        "source_type": "Basic",
+        "target_type": "Cloze",
+        "field_map": {
+            "Text": ["Front", "Back"],
+            "Extra": ["Extra"]
+        }
+    }
+]
+```
+
 ## ⚠️ Important Limitations
 
 * **Review History Reset:** Because the addon creates a *fresh* note and deletes the old one, **review history (scheduling) for that specific card is lost.** The card becomes "New".
 * **Full Sync vs. Media Sync:** This addon prevents a "Full Database Sync," but if you change media filenames or add images, a media sync will still occur (which is normal and fast).
+* **Stale Presets/Mappings:** If source or target fields are renamed later, the addon will block the conversion and ask you to reopen the conversion dialog and update the mapping.
+
+## Changelog
+
+### 09-03-2026
+
+* Fixed conversion rollback so failed runs do not leave partially converted notes behind.
+* Fixed deck preservation so conversions no longer mutate the target note type's default deck.
+* Fixed cloze stripping detection to use the real note type kind instead of matching names like `"Cloze"` or `"Basic"`.
+* Added validation for saved mappings and quick presets so stale field references are blocked with an explicit error instead of silently dropping content.
+* Added a GUI config editor behind the Add-ons **Config** button for managing presets and mappings with the existing conversion dialog.
+* Updated the config editor so source note type can be changed inside the preset/mapping edit window without a separate source picker.
+
+### 22-02-2026
+
+* Fixed Cloze-to-Basic cloze stripping so MathJax/LaTeX content with nested braces is preserved correctly (prevents broken formulas like `\mathbf{E}` / `\frac{...}{...}` after conversion).
 
 ## License
 

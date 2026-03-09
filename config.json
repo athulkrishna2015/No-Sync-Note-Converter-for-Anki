@@ -1,5 +1,7 @@
 {
     "toggle_strip_cloze": true,
+    "preferred_target_models": {},
+    "quick_convert_presets": [],
     "mappings": {
         "Basic->Cloze": {
             "source_type": "Basic",
