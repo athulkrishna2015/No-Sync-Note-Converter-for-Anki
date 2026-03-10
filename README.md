@@ -9,7 +9,8 @@ It bypasses the database schema change by performing a **"Create New → Delete 
 * **Zero-Sync Overhead:** Converts notes without triggering a full database upload.
 * **Unified Conversion Dialog:** Target note type selection and field mapping now happen in one window, with dropdown-based field mapping and ordered multi-field merges.
 * **Quick Convert Presets:** Save named source-to-target conversion presets from the dialog and reuse them from one-click quick convert menus that only appear for matching source note types.
-* **GUI Config Editor:** The Add-ons **Config** button opens a GUI for editing general settings, quick presets, and saved mappings without hand-editing JSON.
+* **Single-Step Undo:** Each conversion is merged into one Anki undo action, so **Edit -> Undo** restores the previous note/card state in a single step.
+* **GUI Config Editor:** Open the config UI from **Tools -> No-Sync Note Converter Config** or the Add-ons **Config** button to edit general settings, quick presets, and saved mappings without hand-editing JSON.
 * **Reviewer Integration:** Convert cards directly while reviewing. The addon will automatically skip to the next card and open a window to edit the new card (perfect for creating Clozes on the fly).
 * **Smart Field Mapping:** Automatically suggests logical mappings (e.g., "Text" -> "Front", "Extra" -> "Back") while allowing full manual control.
 * **Cloze Stripping:** Option to automatically strip `{{c1::...}}` syntax when converting from a Cloze note type to any non-Cloze note type.
@@ -27,7 +28,8 @@ Install via AnkiWeb: [No-Sync Note Converter](https://ankiweb.net/shared/info/41
 1. Select the notes you want to convert.
 2. Go to **Notes** > **No-Sync Convert Note Type**.
 3. **Conversion Dialog:** A dialog will appear for each unique source note type selected. Choose the target note type at the top, then map fields with dropdown selectors below. You can add multiple source fields to one target field, and they will be merged in order.
-4. The old notes are deleted, new ones created, and the editor sidebar will refresh to show the new notes.
+4. The old notes are deleted, new ones created, and the browser refreshes to show the new notes.
+5. If needed, use **Edit -> Undo** once to restore the original notes/cards.
 
 <img width="863" height="722" alt="Screenshot_20260309_185829" src="https://github.com/user-attachments/assets/cf0c8df3-3738-42a9-bdca-edca7c3b6f33" />
 
@@ -45,12 +47,11 @@ The preset name, target note type, and field mapping are customizable. The sourc
 
 ### Config GUI
 
-1. Open **Tools** > **Add-ons**.
-2. Select **No-Sync Note Converter**.
-3. Click **Config**.
-4. Use the GUI tabs to edit the strip-cloze option, quick presets, and saved mappings.
-5. Add/Edit actions reuse the same conversion dialog UI, so field mapping stays consistent with normal conversion.
-6. In the config editor, source note type and target note type can both be changed directly inside the edit window. There is no separate source-selection popup.
+1. Open **Tools** > **No-Sync Note Converter Config**.
+2. Alternatively, open **Tools** > **Add-ons**, select **No-Sync Note Converter**, and click **Config**.
+3. Use the GUI tabs to edit the strip-cloze option, quick presets, and saved mappings.
+4. Add/Edit actions reuse the same conversion dialog UI, so field mapping stays consistent with normal conversion.
+5. In the config editor, source note type and target note type can both be changed directly inside the edit window. There is no separate source-selection popup.
 
 ### 2. In the Reviewer (Single Card Mode)
 
@@ -58,6 +59,7 @@ The preset name, target note type, and field mapping are customizable. The sourc
 2. Select **No-Sync Convert Note Type**.
 3. **Conversion Dialog:** Choose the target note type and map the fields in the same window. You can add multiple source fields to one target field, and they will be merged in order.
 4. **Action:** The current card is converted and deleted. Anki will immediately move you to the **Next Card**, and a separate **Browser Window** will open focused on the new card so you can edit it (e.g., to add Cloze deletions).
+5. If you want to revert it, use **Edit -> Undo** once.
 
 ## Configuration (`config.json`)
 
@@ -107,6 +109,19 @@ The shipped `config.json` provides defaults, but once you edit settings in Anki,
 ]
 ```
 
+## Project Layout
+
+The addon is now split into smaller modules for easier maintenance:
+
+* `__init__.py`: addon entrypoint and hook registration.
+* `state.py`: shared config state, defaults, and constants.
+* `mapping.py`: mapping validation, preset helpers, and cloze stripping.
+* `conversion_dialog.py`: main conversion dialog UI.
+* `config_dialog.py`: addon config window, support tab, and Tools menu registration.
+* `operations.py`: note conversion logic and custom undo handling.
+* `browser_actions.py`: Browser menu actions and quick-convert integration.
+* `reviewer_actions.py`: Reviewer context-menu actions.
+
 ## ⚠️ Important Limitations
 
 * **Review History Reset:** Because the addon creates a *fresh* note and deletes the old one, **review history (scheduling) for that specific card is lost.** The card becomes "New".
@@ -114,6 +129,12 @@ The shipped `config.json` provides defaults, but once you edit settings in Anki,
 * **Stale Presets/Mappings:** If source or target fields are renamed later, the addon will block the conversion and ask you to reopen the conversion dialog and update the mapping.
 
 ## Changelog
+
+### 10-03-2026
+
+* Added single-step undo for note conversion, so one **Edit -> Undo** restores the previous notes/cards.
+* Added a direct **Tools -> No-Sync Note Converter Config** action.
+* Refactored the addon into smaller modules to make the codebase easier to maintain.
 
 ### 09-03-2026
 
