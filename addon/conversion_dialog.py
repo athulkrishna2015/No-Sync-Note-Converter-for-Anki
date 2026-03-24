@@ -58,6 +58,22 @@ class ConversionDialog(QDialog):
         self.setMinimumWidth(560)
         self.setup_ui()
 
+        # Initialize deck combo with current decks
+        self.deck_combo.addItem("Same as original", None)
+        for deck in sorted(mw.col.decks.all_names_and_ids(), key=lambda x: x.name):
+            self.deck_combo.addItem(deck.name, deck.id)
+
+        # Load saved settings
+        self.open_after_cb.setChecked(state.config.get("open_notes_after", True))
+        self.delete_original_cb.setChecked(state.config.get("delete_original", True))
+        self.strip_cloze_cb.setChecked(state.config.get("toggle_strip_cloze", True))
+        
+        target_deck_id = state.config.get("target_deck_id")
+        if target_deck_id:
+            idx = self.deck_combo.findData(target_deck_id)
+            if idx != -1:
+                self.deck_combo.setCurrentIndex(idx)
+
         self.set_source_model(self.initial_source_model_name)
         if self.allow_source_selection:
             self.source_combo.blockSignals(True)
@@ -105,6 +121,27 @@ class ConversionDialog(QDialog):
         self.target_combo.currentTextChanged.connect(self.on_target_changed)
         target_row.addWidget(self.target_combo, 1)
         layout.addLayout(target_row)
+
+        deck_row = QHBoxLayout()
+        deck_row.addWidget(QLabel("Target deck"))
+        self.deck_combo = QComboBox()
+        deck_row.addWidget(self.deck_combo, 1)
+        layout.addLayout(deck_row)
+
+        options_group = QGroupBox("Options")
+        options_layout = QVBoxLayout()
+        options_group.setLayout(options_layout)
+
+        self.open_after_cb = QCheckBox("Open notes in browser/editor after conversion")
+        options_layout.addWidget(self.open_after_cb)
+
+        self.delete_original_cb = QCheckBox("Delete original notes after conversion")
+        options_layout.addWidget(self.delete_original_cb)
+
+        self.strip_cloze_cb = QCheckBox("Remove clozes in non-cloze fields")
+        options_layout.addWidget(self.strip_cloze_cb)
+
+        layout.addWidget(options_group)
 
         self.mapping_label = QLabel()
         layout.addWidget(self.mapping_label)
@@ -356,6 +393,23 @@ class ConversionDialog(QDialog):
             mapping[target_field] = sources
         return mapping
 
+    def accept(self):
+        # Save settings for next time
+        state.config["open_notes_after"] = self.open_after_cb.isChecked()
+        state.config["delete_original"] = self.delete_original_cb.isChecked()
+        state.config["toggle_strip_cloze"] = self.strip_cloze_cb.isChecked()
+        state.config["target_deck_id"] = self.deck_combo.currentData()
+        state.save_config()
+        super().accept()
+
+    def get_settings(self):
+        return {
+            "open_notes_after": self.open_after_cb.isChecked(),
+            "delete_original": self.delete_original_cb.isChecked(),
+            "toggle_strip_cloze": self.strip_cloze_cb.isChecked(),
+            "target_deck_id": self.deck_combo.currentData(),
+        }
+
     def save_quick_preset(self):
         source_model = self.get_source_model()
         target_model = self.get_target_model()
@@ -393,6 +447,6 @@ def show_conversion_dialog(parent, old_model):
         ),
     )
     if not dialog.exec():
-        return None, None
+        return None, None, None
 
-    return dialog.get_target_model(), dialog.get_mapping()
+    return dialog.get_target_model(), dialog.get_mapping(), dialog.get_settings()

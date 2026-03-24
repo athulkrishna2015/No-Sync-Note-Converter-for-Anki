@@ -77,6 +77,18 @@ def ensure_config_defaults():
         config["toggle_strip_cloze"] = True
         changed = True
 
+    if "open_notes_after" not in config:
+        config["open_notes_after"] = True
+        changed = True
+
+    if "delete_original" not in config:
+        config["delete_original"] = True
+        changed = True
+
+    if "target_deck_id" not in config:
+        config["target_deck_id"] = None  # None means "same as original"
+        changed = True
+
     if changed:
         save_config()
 

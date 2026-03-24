@@ -8,6 +8,12 @@ It bypasses the database schema change by performing a **"Create New → Delete 
 
 * **Zero-Sync Overhead:** Converts notes without triggering a full database upload.
 * **Unified Conversion Dialog:** Target note type selection and field mapping now happen in one window, with dropdown-based field mapping and ordered multi-field merges.
+* **Smart Settings & Persistence:** New checkboxes to control post-conversion behavior:
+    * **Open notes after conversion:** Automatically opens the browser focused on the new notes.
+    * **Delete original notes:** Controls whether the source notes are removed (enabled by default for zero-sync).
+    * **Remove clozes:** Toggle cloze stripping for non-cloze target types.
+    * **Target Deck:** Select a specific deck for the converted notes or keep them in their original deck.
+    * Settings are remembered for your next conversion.
 * **Quick Convert Presets:** Save named source-to-target conversion presets from the dialog and reuse them from one-click quick convert menus that only appear for matching source note types.
 * **Single-Step Undo:** Each conversion is merged into one Anki undo action, so **Edit -> Undo** restores the previous note/card state in a single step.
 * **GUI Config Editor:** Open the config UI from **Tools -> No-Sync Note Converter Config** or the Add-ons **Config** button to edit general settings, quick presets, and saved mappings without hand-editing JSON.
@@ -26,7 +32,7 @@ Install via AnkiWeb: [No-Sync Note Converter](https://ankiweb.net/shared/info/41
 ### 1. In the Browser (Batch Mode)
 
 1. Select the notes you want to convert.
-2. Go to **Notes** > **No-Sync Convert Note Type**.
+2. **Right-Click** and select **No-Sync Convert Note Type**, or go to **Notes** > **No-Sync Convert Note Type**.
 3. **Conversion Dialog:** A dialog will appear for each unique source note type selected. Choose the target note type at the top, then map fields with dropdown selectors below. You can add multiple source fields to one target field, and they will be merged in order.
 4. The old notes are deleted, new ones created, and the browser refreshes to show the new notes.
 5. If needed, use **Edit -> Undo** once to restore the original notes/cards.
@@ -129,6 +135,14 @@ The addon is now split into smaller modules for easier maintenance:
 * **Stale Presets/Mappings:** If source or target fields are renamed later, the addon will block the conversion and ask you to reopen the conversion dialog and update the mapping.
 
 ## Changelog
+
+### 24-03-2026
+
+* **Enhanced Browser Integration:** Added conversion actions directly to the browser's right-click context menu.
+* **New Conversion Options:** Added checkboxes to control whether to open notes in the browser after conversion, delete original notes, and strip clozes.
+* **Deck Selection:** Added the ability to choose a target deck for converted notes (defaults to the original deck).
+* **Setting Persistence:** All conversion options are now remembered for the next use.
+* **Project Standardization:** Renamed internal package components and updated build scripts for consistency as "No-Sync Note Converter."
 
 ### 10-03-2026
 

@@ -36,11 +36,36 @@ class AddonConfigDialog(QDialog):
 
         general_tab = QWidget()
         general_layout = QVBoxLayout(general_tab)
+        
+        self.open_after_checkbox = QCheckBox("Open notes in browser/editor after conversion")
+        self.open_after_checkbox.setChecked(state.config.get("open_notes_after", True))
+        general_layout.addWidget(self.open_after_checkbox)
+
+        self.delete_original_checkbox = QCheckBox("Delete original notes after conversion")
+        self.delete_original_checkbox.setChecked(state.config.get("delete_original", True))
+        general_layout.addWidget(self.delete_original_checkbox)
+
         self.strip_cloze_checkbox = QCheckBox(
             "Strip cloze markup when converting from a Cloze note type to a non-Cloze note type"
         )
         self.strip_cloze_checkbox.setChecked(self.working_toggle_strip_cloze)
         general_layout.addWidget(self.strip_cloze_checkbox)
+
+        general_layout.addSpacing(10)
+        deck_row = QHBoxLayout()
+        deck_row.addWidget(QLabel("Default target deck:"))
+        self.deck_combo = QComboBox()
+        self.deck_combo.addItem("Same as original", None)
+        for deck in sorted(mw.col.decks.all_names_and_ids(), key=lambda x: x.name):
+            self.deck_combo.addItem(deck.name, deck.id)
+        
+        target_deck_id = state.config.get("target_deck_id")
+        if target_deck_id:
+            idx = self.deck_combo.findData(target_deck_id)
+            if idx != -1:
+                self.deck_combo.setCurrentIndex(idx)
+        deck_row.addWidget(self.deck_combo, 1)
+        general_layout.addLayout(deck_row)
 
         general_hint = QLabel(
             "Use the tabs below to manage quick presets and saved field mappings with the same GUI used during conversion."
@@ -419,7 +444,10 @@ class AddonConfigDialog(QDialog):
         self.refresh_mapping_list()
 
     def accept(self):
+        state.config["open_notes_after"] = self.open_after_checkbox.isChecked()
+        state.config["delete_original"] = self.delete_original_checkbox.isChecked()
         state.config["toggle_strip_cloze"] = self.strip_cloze_checkbox.isChecked()
+        state.config["target_deck_id"] = self.deck_combo.currentData()
         state.config["quick_convert_presets"] = copy.deepcopy(self.working_presets)
         state.config["mappings"] = copy.deepcopy(self.working_mappings)
         state.save_config()

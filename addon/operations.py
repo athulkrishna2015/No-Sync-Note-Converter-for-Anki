@@ -32,13 +32,17 @@ def finish_browser_conversion(browser, created_nids):
         pass
 
 
-def core_convert_logic(nids, target_model, override_mapping=None):
+def core_convert_logic(nids, target_model, override_mapping=None, override_settings=None):
     """
     Performs the actual Create New -> Delete Old logic.
     Returns a list of new Note IDs.
     """
     if not nids:
         return []
+
+    settings = state.config.copy()
+    if override_settings:
+        settings.update(override_settings)
 
     mw.progress.start()
 
@@ -76,16 +80,14 @@ def core_convert_logic(nids, target_model, override_mapping=None):
 
                 new_note = mw.col.new_note(target_model)
 
+                strip_cloze = settings.get("toggle_strip_cloze", True)
+
                 if field_map is not None:
                     for target_field, source_fields in field_map.items():
                         combined_content = []
                         for src in source_fields:
                             content = old_note[src]
-                            if (
-                                state.config["toggle_strip_cloze"]
-                                and source_is_cloze
-                                and not target_is_cloze
-                            ):
+                            if strip_cloze and source_is_cloze and not target_is_cloze:
                                 content = strip_cloze_tags(content)
                             combined_content.append(content)
 
@@ -94,21 +96,21 @@ def core_convert_logic(nids, target_model, override_mapping=None):
                     for field in old_note.keys():
                         if field in new_note:
                             content = old_note[field]
-                            if (
-                                state.config["toggle_strip_cloze"]
-                                and source_is_cloze
-                                and not target_is_cloze
-                            ):
+                            if strip_cloze and source_is_cloze and not target_is_cloze:
                                 content = strip_cloze_tags(content)
                             new_note[field] = content
 
                 old_cards = old_note.cards()
-                deck_id = old_cards[0].did if old_cards else 1
+                deck_id = settings.get("target_deck_id")
+                if not deck_id:
+                    deck_id = old_cards[0].did if old_cards else 1
                 new_note.tags = old_note.tags
 
                 mw.col.add_note(new_note, deck_id=deck_id)
                 pending_nids.append(new_note.id)
-                mw.col.remove_notes([nid])
+                
+                if settings.get("delete_original", True):
+                    mw.col.remove_notes([nid])
 
             created_nids.extend(pending_nids)
 

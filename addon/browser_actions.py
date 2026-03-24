@@ -25,23 +25,31 @@ def on_browser_convert(browser):
     notes_by_mid = group_note_ids_by_model(nids)
 
     all_created_nids = []
+    open_after = False
     for mid, model_nids in notes_by_mid.items():
         old_model = mw.col.models.get(mid)
         if not old_model:
             continue
 
-        target_model, mapping = show_conversion_dialog(browser, old_model)
+        target_model, mapping, settings = show_conversion_dialog(browser, old_model)
         if not target_model:
             continue
 
+        if settings.get("open_notes_after"):
+            open_after = True
+
         remember_conversion_pair(old_model["name"], target_model["name"], mapping)
         created_nids = core_convert_logic(
-            model_nids, target_model, override_mapping=mapping
+            model_nids, target_model, override_mapping=mapping, override_settings=settings
         )
         all_created_nids.extend(created_nids)
 
     if all_created_nids:
-        finish_browser_conversion(browser, all_created_nids)
+        if open_after:
+            finish_browser_conversion(browser, all_created_nids)
+        else:
+            mw.reset()
+            browser.onSearch(reset=False)
         tooltip(f"Converted {len(all_created_nids)} notes.")
 
 
@@ -126,7 +134,12 @@ def on_browser_quick_convert(browser, source_model_name, target_model_name, pres
         override_mapping=preset["field_map"],
     )
     if created_nids:
-        finish_browser_conversion(browser, created_nids)
+        if state.config.get("open_notes_after", True):
+            finish_browser_conversion(browser, created_nids)
+        else:
+            mw.reset()
+            browser.onSearch(reset=False)
+        
         message = (
             f"Converted {len(created_nids)} notes with preset "
             f"'{preset_name}' ({source_model_name} -> {target_model_name})."
@@ -147,3 +160,13 @@ def setup_browser_menu(browser):
         lambda: populate_browser_quick_convert_menu(browser, quick_menu)
     )
     browser.form.menu_Notes.addMenu(quick_menu)
+
+
+def setup_browser_context_menu(browser, menu):
+    menu.addSeparator()
+    action = menu.addAction("No-Sync Convert Note Type")
+    action.triggered.connect(lambda: on_browser_convert(browser))
+
+    quick_menu = menu.addMenu("No-Sync Quick Convert")
+    # Populate the quick menu immediately for the context menu
+    populate_browser_quick_convert_menu(browser, quick_menu)

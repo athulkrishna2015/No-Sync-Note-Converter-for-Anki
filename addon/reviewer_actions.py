@@ -19,20 +19,23 @@ def on_reviewer_convert(reviewer):
     old_note = card.note()
     old_model = old_note.note_type()
 
-    target_model, mapping = show_conversion_dialog(mw, old_model)
+    target_model, mapping, settings = show_conversion_dialog(mw, old_model)
     if not target_model:
         return
 
     remember_conversion_pair(old_model["name"], target_model["name"], mapping)
 
-    created_nids = core_convert_logic([card.nid], target_model, override_mapping=mapping)
+    created_nids = core_convert_logic(
+        [card.nid], target_model, override_mapping=mapping, override_settings=settings
+    )
 
     if created_nids:
         reviewer.nextCard()
         mw.reset()
 
-        query = f"nid:{created_nids[0]}"
-        dialogs.open("Browser", mw, search=[query])
+        if settings.get("open_notes_after"):
+            query = f"nid:{created_nids[0]}"
+            dialogs.open("Browser", mw, search=[query])
 
 
 def on_reviewer_quick_convert(
@@ -72,8 +75,10 @@ def on_reviewer_quick_convert(
         reviewer.nextCard()
         mw.reset()
 
-        query = f"nid:{created_nids[0]}"
-        dialogs.open("Browser", mw, search=[query])
+        if state.config.get("open_notes_after", True):
+            query = f"nid:{created_nids[0]}"
+            dialogs.open("Browser", mw, search=[query])
+
         tooltip(
             f"Converted with preset '{preset_name}' ({source_model_name} -> {target_model_name})."
         )
