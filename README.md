@@ -134,6 +134,13 @@ The addon is now split into smaller modules for easier maintenance:
 * **Full Sync vs. Media Sync:** This addon prevents a "Full Database Sync," but if you change media filenames or add images, a media sync will still occur (which is normal and fast).
 * **Stale Presets/Mappings:** If source or target fields are renamed later, the addon will block the conversion and ask you to reopen the conversion dialog and update the mapping.
 
+---
+## Support
+
+If you find this add-on useful, please consider supporting its development:
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/D1D01W6NQT)
+
 ## Changelog
 
 ### 24-03-2026

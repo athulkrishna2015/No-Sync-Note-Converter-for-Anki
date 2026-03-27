@@ -8,6 +8,8 @@ from . import state
 from .conversion_dialog import ConversionDialog
 from .mapping import format_quick_preset_label, prompt_preset_name
 
+from aqt.utils import qconnect, openLink
+from aqt.webview import AnkiWebView
 
 class AddonConfigDialog(QDialog):
     def __init__(self, parent):
@@ -144,6 +146,31 @@ class AddonConfigDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+        # Ko-fi Widget (Embedded Script)
+        self.support_webview = AnkiWebView(support_tab)
+        self.support_webview.setFixedHeight(40)  # Enough for the widget button if not floating, but here it's floating
+        # For a floating widget, we need the script in a page. 
+        # The widget itself is fixed/absolute positioned by the script.
+        kofi_html = f"""
+        <html>
+        <head>
+        <style>
+          body {{ background-color: transparent; margin: 0; padding: 0; overflow: hidden; }}
+        </style>
+        <script type='text/javascript' src='https://storage.ko-fi.com/cdn/widget/Widget_2.js'></script>
+        <script type='text/javascript'>
+          kofiwidget2.init('Support me on Ko-fi', '#72a4f2', 'D1D01W6NQT');
+          kofiwidget2.draw();
+        </script>
+        </head>
+        <body></body>
+        </html>
+        """
+        self.support_webview.setHtml(kofi_html)
+        support_layout.addWidget(self.support_webview)
+
+
 
     def create_support_item(self, item):
         frame = QFrame()
