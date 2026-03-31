@@ -40,8 +40,7 @@ Install via AnkiWeb: [No-Sync Note Converter](https://ankiweb.net/shared/info/41
 5. The old notes are deleted, new ones created, and the browser refreshes to show the new notes.
 6. If needed, use **Edit -> Undo** once to restore the original notes/cards.
 
-<img width="863" height="722" alt="Screenshot_20260309_185829" src="https://github.com/user-attachments/assets/cf0c8df3-3738-42a9-bdca-edca7c3b6f33" />
-
+<img width="1036" height="956" alt="Screenshot_20260331_155422" src="https://github.com/user-attachments/assets/4d944c78-b912-419f-961e-6c2222b1cc6a" />
 
 ### Quick Presets
 
