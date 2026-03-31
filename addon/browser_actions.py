@@ -2,7 +2,11 @@ from aqt import mw
 from aqt.qt import QAction, QMenu
 from aqt.utils import showInfo, tooltip
 
-from .conversion_dialog import show_conversion_dialog
+from . import state
+from .conversion_dialog import (
+    show_conversion_dialog,
+    show_multi_source_conversion_dialog,
+)
 from .mapping import (
     format_quick_preset_label,
     get_quick_convert_preset,
@@ -16,6 +20,31 @@ from .operations import (
 )
 
 
+def _get_sample_note_ids_by_model(notes_by_mid):
+    sample_note_ids_by_model = {}
+    for mid, model_nids in notes_by_mid.items():
+        old_model = mw.col.models.get(mid)
+        if not old_model or not model_nids:
+            continue
+
+        best_nid = model_nids[0]
+        best_card_count = -1
+        for nid in model_nids:
+            try:
+                note = mw.col.get_note(nid)
+                card_count = len(note.cards())
+            except Exception:
+                card_count = -1
+
+            if card_count > best_card_count:
+                best_nid = nid
+                best_card_count = card_count
+
+        sample_note_ids_by_model[old_model["name"]] = best_nid
+
+    return sample_note_ids_by_model
+
+
 def on_browser_convert(browser):
     nids = browser.selectedNotes()
     if not nids:
@@ -23,26 +52,73 @@ def on_browser_convert(browser):
         return
 
     notes_by_mid = group_note_ids_by_model(nids)
-
-    all_created_nids = []
-    open_after = False
+    model_names_by_mid = {}
     for mid, model_nids in notes_by_mid.items():
         old_model = mw.col.models.get(mid)
         if not old_model:
             continue
+        model_names_by_mid[mid] = old_model["name"]
+    sample_note_ids_by_model = _get_sample_note_ids_by_model(notes_by_mid)
 
-        target_model, mapping, settings = show_conversion_dialog(browser, old_model)
-        if not target_model:
-            continue
+    all_created_nids = []
+    open_after = False
+    if len(model_names_by_mid) > 1:
+        conversion_plans, settings = show_multi_source_conversion_dialog(
+            browser,
+            list(model_names_by_mid.values()),
+            sample_note_ids_by_model,
+        )
+        if not conversion_plans:
+            return
 
         if settings.get("open_notes_after"):
             open_after = True
 
-        remember_conversion_pair(old_model["name"], target_model["name"], mapping)
-        created_nids = core_convert_logic(
-            model_nids, target_model, override_mapping=mapping, override_settings=settings
-        )
-        all_created_nids.extend(created_nids)
+        for mid, model_nids in notes_by_mid.items():
+            source_model_name = model_names_by_mid.get(mid)
+            conversion_plan = conversion_plans.get(source_model_name)
+            if not conversion_plan:
+                continue
+
+            remember_conversion_pair(
+                source_model_name,
+                conversion_plan["target_model"]["name"],
+                conversion_plan["mapping"],
+            )
+            created_nids = core_convert_logic(
+                model_nids,
+                conversion_plan["target_model"],
+                override_mapping=conversion_plan["mapping"],
+                override_settings=settings,
+            )
+            all_created_nids.extend(created_nids)
+    else:
+        for mid, model_nids in notes_by_mid.items():
+            old_model = mw.col.models.get(mid)
+            if not old_model:
+                continue
+
+            target_model, mapping, settings = show_conversion_dialog(
+                browser,
+                old_model,
+                sample_note_ids_by_model={
+                    old_model["name"]: sample_note_ids_by_model.get(old_model["name"])
+                },
+            )
+            if not target_model:
+                continue
+
+            if settings.get("open_notes_after"):
+                open_after = True
+
+            remember_conversion_pair(old_model["name"], target_model["name"], mapping)
+            created_nids = core_convert_logic(
+                model_nids,
+                target_model,
+                override_mapping=mapping,
+                override_settings=settings,
+            )
+            all_created_nids.extend(created_nids)
 
     if all_created_nids:
         if open_after:

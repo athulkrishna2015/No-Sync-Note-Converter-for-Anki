@@ -1,6 +1,7 @@
 from aqt import dialogs, mw
 from aqt.utils import showInfo, tooltip
 
+from . import state
 from .conversion_dialog import show_conversion_dialog
 from .mapping import (
     format_quick_preset_label,
@@ -19,7 +20,14 @@ def on_reviewer_convert(reviewer):
     old_note = card.note()
     old_model = old_note.note_type()
 
-    target_model, mapping, settings = show_conversion_dialog(mw, old_model)
+    target_model, mapping, settings = show_conversion_dialog(
+        mw,
+        old_model,
+        sample_note_ids_by_model={old_model["name"]: old_note.id},
+        initial_review_history_card_ord_by_model={
+            old_model["name"]: int(card.ord)
+        },
+    )
     if not target_model:
         return
 
@@ -70,6 +78,7 @@ def on_reviewer_quick_convert(
         [card.nid],
         target_model,
         override_mapping=preset["field_map"],
+        override_settings={"review_history_source_card_ord": int(card.ord)},
     )
     if created_nids:
         reviewer.nextCard()

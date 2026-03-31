@@ -32,6 +32,70 @@ def finish_browser_conversion(browser, created_nids):
         pass
 
 
+def _get_card_by_ord(cards, ord_value):
+    try:
+        ord_value = int(ord_value)
+    except (TypeError, ValueError):
+        return None
+
+    for card in cards:
+        if int(card.ord) == ord_value:
+            return card
+    return None
+
+
+def _copy_card_scheduling(source_card, target_card):
+    for attr in (
+        "type",
+        "queue",
+        "due",
+        "ivl",
+        "factor",
+        "reps",
+        "lapses",
+        "left",
+        "odue",
+        "odid",
+        "flags",
+        "custom_data",
+        "memory_state",
+        "desired_retention",
+        "decay",
+        "last_review_time",
+    ):
+        setattr(target_card, attr, getattr(source_card, attr))
+
+
+def _get_preferred_review_history_ord(settings, source_model_name):
+    preferred_ord = settings.get("review_history_source_card_ord")
+    if preferred_ord is not None:
+        return preferred_ord
+
+    saved_ords = settings.get("review_history_source_card_ord_by_model", {})
+    if isinstance(saved_ords, dict):
+        return saved_ords.get(source_model_name, 0)
+
+    return 0
+
+
+def _preserve_review_history(old_cards, new_note, preferred_source_ord, delete_original):
+    try:
+        if not old_cards or not new_note.id:
+            return
+
+        source_card = _get_card_by_ord(old_cards, preferred_source_ord) or old_cards[0]
+        target_cards = new_note.cards()
+        if not target_cards:
+            return
+
+        target_card = _get_card_by_ord(target_cards, source_card.ord) or target_cards[0]
+        _copy_card_scheduling(source_card, target_card)
+        mw.col.update_card(target_card)
+    except Exception:
+        # Review-history transfer is best-effort and should not abort conversion.
+        return
+
+
 def core_convert_logic(nids, target_model, override_mapping=None, override_settings=None):
     """
     Performs the actual Create New -> Delete Old logic.
@@ -108,7 +172,18 @@ def core_convert_logic(nids, target_model, override_mapping=None, override_setti
 
                 mw.col.add_note(new_note, deck_id=deck_id)
                 pending_nids.append(new_note.id)
-                
+
+                if settings.get("preserve_review_history", True):
+                    _preserve_review_history(
+                        old_cards,
+                        new_note,
+                        _get_preferred_review_history_ord(
+                            settings,
+                            old_model["name"],
+                        ),
+                        settings.get("delete_original", True),
+                    )
+
                 if settings.get("delete_original", True):
                     mw.col.remove_notes([nid])
 

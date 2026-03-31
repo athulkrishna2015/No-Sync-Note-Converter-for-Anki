@@ -1,5 +1,7 @@
 {
     "toggle_strip_cloze": true,
+    "preserve_review_history": true,
+    "review_history_source_card_ord_by_model": {},
     "preferred_target_models": {},
     "quick_convert_presets": [],
     "mappings": {

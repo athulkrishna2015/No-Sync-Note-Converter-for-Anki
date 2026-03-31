@@ -145,3 +145,4 @@ cython_debug/
 
 # Anki packages
 *.ankiaddon
+.codex

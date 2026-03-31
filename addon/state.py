@@ -85,6 +85,28 @@ def ensure_config_defaults():
         config["delete_original"] = True
         changed = True
 
+    if "preserve_review_history" not in config:
+        config["preserve_review_history"] = True
+        changed = True
+
+    review_history_card_ords = config.get("review_history_source_card_ord_by_model")
+    normalized_review_history_card_ords = {}
+    if isinstance(review_history_card_ords, dict):
+        for model_name, ord_value in review_history_card_ords.items():
+            if not isinstance(model_name, str):
+                continue
+            try:
+                ord_value = int(ord_value)
+            except (TypeError, ValueError):
+                continue
+            if ord_value >= 0:
+                normalized_review_history_card_ords[model_name] = ord_value
+    if review_history_card_ords != normalized_review_history_card_ords:
+        config["review_history_source_card_ord_by_model"] = (
+            normalized_review_history_card_ords
+        )
+        changed = True
+
     if "target_deck_id" not in config:
         config["target_deck_id"] = None  # None means "same as original"
         changed = True

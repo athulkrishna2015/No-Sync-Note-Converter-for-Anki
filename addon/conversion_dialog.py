@@ -22,6 +22,9 @@ class ConversionDialog(QDialog):
         initial_mapping=None,
         *,
         allow_source_selection=False,
+        available_source_model_names=None,
+        sample_note_ids_by_model=None,
+        initial_review_history_card_ord_by_model=None,
         show_save_preset_button=True,
         window_title="Convert Note Type",
         title_html=None,
@@ -32,11 +35,22 @@ class ConversionDialog(QDialog):
         if not self.available_model_names:
             raise ValueError("No note types are available.")
 
+        requested_source_model_names = (
+            available_source_model_names or self.available_model_names
+        )
+        self.available_source_model_names = [
+            model_name
+            for model_name in requested_source_model_names
+            if model_name in self.available_model_names
+        ]
+        if not self.available_source_model_names:
+            self.available_source_model_names = list(self.available_model_names)
+
         self.initial_source_model_name = initial_source_model_name
         if old_model is not None:
             self.initial_source_model_name = old_model["name"]
-        if self.initial_source_model_name not in self.available_model_names:
-            self.initial_source_model_name = self.available_model_names[0]
+        if self.initial_source_model_name not in self.available_source_model_names:
+            self.initial_source_model_name = self.available_source_model_names[0]
 
         self.old_model = None
         self.old_fields = []
@@ -44,6 +58,12 @@ class ConversionDialog(QDialog):
         self.active_target_name = None
         self.mapping_rows = {}
         self.temp_mappings = {}
+        self.target_model_names_by_source = {}
+        self.sample_note_ids_by_model = dict(sample_note_ids_by_model or {})
+        self.review_history_card_ords = self.load_review_history_card_ords()
+        self.initial_review_history_card_ords = self.normalize_review_history_card_ords(
+            initial_review_history_card_ord_by_model
+        )
         self.initial_target_model_name = initial_target_model_name
         self.has_initial_mapping = initial_mapping is not None
         self.initial_mapping = normalize_field_map(initial_mapping or {})
@@ -58,6 +78,11 @@ class ConversionDialog(QDialog):
         self.setMinimumWidth(560)
         self.setup_ui()
 
+        if self.initial_target_model_name:
+            self.target_model_names_by_source[self.initial_source_model_name] = (
+                self.initial_target_model_name
+            )
+
         # Initialize deck combo with current decks
         self.deck_combo.addItem("Same as original", None)
         for deck in sorted(mw.col.decks.all_names_and_ids(), key=lambda x: x.name):
@@ -66,8 +91,11 @@ class ConversionDialog(QDialog):
         # Load saved settings
         self.open_after_cb.setChecked(state.config.get("open_notes_after", True))
         self.delete_original_cb.setChecked(state.config.get("delete_original", True))
+        self.preserve_review_history_cb.setChecked(
+            state.config.get("preserve_review_history", True)
+        )
         self.strip_cloze_cb.setChecked(state.config.get("toggle_strip_cloze", True))
-        
+
         target_deck_id = state.config.get("target_deck_id")
         if target_deck_id:
             idx = self.deck_combo.findData(target_deck_id)
@@ -82,16 +110,12 @@ class ConversionDialog(QDialog):
             )
             self.source_combo.blockSignals(False)
 
-        models = self.available_model_names
-        default_target_name = initial_target_model_name or get_default_target_model_name(
-            models, [self.old_model["name"]]
-        )
-        self.target_combo.blockSignals(True)
-        if default_target_name in models:
-            self.target_combo.setCurrentIndex(models.index(default_target_name))
-        self.target_combo.blockSignals(False)
+        self.set_target_for_source(self.old_model["name"])
         self.active_source_name = self.old_model["name"]
         self.active_target_name = self.target_combo.currentData()
+        self.target_model_names_by_source[self.active_source_name] = (
+            self.active_target_name
+        )
         self.build_mapping_rows(self.get_saved_mapping(self.active_target_name))
 
     def setup_ui(self):
@@ -106,7 +130,7 @@ class ConversionDialog(QDialog):
             source_row.addWidget(QLabel("Source note type"))
 
             self.source_combo = QComboBox()
-            for model_name in self.available_model_names:
+            for model_name in self.available_source_model_names:
                 self.source_combo.addItem(model_name, model_name)
             self.source_combo.currentTextChanged.connect(self.on_source_changed)
             source_row.addWidget(self.source_combo, 1)
@@ -137,6 +161,23 @@ class ConversionDialog(QDialog):
 
         self.delete_original_cb = QCheckBox("Delete original notes after conversion")
         options_layout.addWidget(self.delete_original_cb)
+
+        self.preserve_review_history_cb = QCheckBox(
+            "Preserve review history on the merged card"
+        )
+        self.preserve_review_history_cb.toggled.connect(
+            self.update_review_history_controls
+        )
+        options_layout.addWidget(self.preserve_review_history_cb)
+
+        self.review_history_row = QWidget()
+        review_history_row = QHBoxLayout(self.review_history_row)
+        review_history_row.setContentsMargins(0, 0, 0, 0)
+        self.review_history_source_label = QLabel("Use history from")
+        review_history_row.addWidget(self.review_history_source_label)
+        self.review_history_source_combo = QComboBox()
+        review_history_row.addWidget(self.review_history_source_combo, 1)
+        options_layout.addWidget(self.review_history_row)
 
         self.strip_cloze_cb = QCheckBox("Remove clozes in non-cloze fields")
         options_layout.addWidget(self.strip_cloze_cb)
@@ -197,6 +238,27 @@ class ConversionDialog(QDialog):
         except (IndexError, KeyError, ValueError):
             return self.title_html_template
 
+    def normalize_review_history_card_ords(self, saved):
+        if not isinstance(saved, dict):
+            return {}
+
+        normalized = {}
+        for model_name, ord_value in saved.items():
+            if not isinstance(model_name, str):
+                continue
+            try:
+                ord_value = int(ord_value)
+            except (TypeError, ValueError):
+                continue
+            if ord_value >= 0:
+                normalized[model_name] = ord_value
+        return normalized
+
+    def load_review_history_card_ords(self):
+        return self.normalize_review_history_card_ords(
+            state.config.get("review_history_source_card_ord_by_model")
+        )
+
     def set_source_model(self, source_model_name):
         source_model = mw.col.models.by_name(source_model_name)
         if not source_model:
@@ -205,9 +267,137 @@ class ConversionDialog(QDialog):
         self.old_model = source_model
         self.old_fields = [field["name"] for field in self.old_model["flds"]]
         self.title_label.setText(self.render_title_html())
+        self.populate_review_history_cards()
 
-    def get_saved_mapping(self, target_model_name):
-        pair_key = self.get_pair_key(target_model_name=target_model_name)
+    def get_sample_note(self, source_model_name=None):
+        source_name = source_model_name or (
+            self.old_model["name"] if self.old_model is not None else None
+        )
+        if not source_name:
+            return None
+
+        note_id = self.sample_note_ids_by_model.get(source_name)
+        if note_id is None:
+            return None
+
+        try:
+            note = mw.col.get_note(note_id)
+        except Exception:
+            return None
+
+        note_model = note.note_type()
+        if not note_model or note_model["name"] != source_name:
+            return None
+
+        return note
+
+    def remember_current_review_history_card(self):
+        if self.old_model is None:
+            return
+
+        selected_ord = self.review_history_source_combo.currentData()
+        if selected_ord is None:
+            return
+
+        self.review_history_card_ords[self.old_model["name"]] = int(selected_ord)
+
+    def get_saved_review_history_card_ord(self):
+        if self.old_model is None:
+            return 0
+
+        source_name = self.old_model["name"]
+        ord_value = self.review_history_card_ords.get(
+            source_name,
+            self.initial_review_history_card_ords.get(source_name, 0),
+        )
+        return ord_value if isinstance(ord_value, int) and ord_value >= 0 else 0
+
+    def build_review_history_card_choices(self):
+        note = self.get_sample_note()
+        if note is not None:
+            cards = sorted(note.cards(), key=lambda card: int(card.ord))
+            if cards:
+                choices = []
+                for card in cards:
+                    label = f"Card {int(card.ord) + 1}"
+                    template_name = str(card.template().get("name", "")).strip()
+                    if template_name:
+                        label = f"{label}: {template_name}"
+                    choices.append((label, int(card.ord)))
+                return choices
+
+        templates = self.old_model.get("tmpls", []) if self.old_model else []
+        if not templates:
+            templates = [{"name": ""}]
+
+        choices = []
+        for ord_value, template in enumerate(templates):
+            template_name = str(template.get("name", "")).strip()
+            label = f"Card {ord_value + 1}"
+            if template_name:
+                label = f"{label}: {template_name}"
+            choices.append((label, ord_value))
+        return choices
+
+    def populate_review_history_cards(self):
+        self.review_history_source_combo.clear()
+
+        for label, ord_value in self.build_review_history_card_choices():
+            self.review_history_source_combo.addItem(label, ord_value)
+
+        selected_ord = self.get_saved_review_history_card_ord()
+        selected_index = self.review_history_source_combo.findData(selected_ord)
+        if selected_index == -1:
+            selected_index = 0
+        self.review_history_source_combo.setCurrentIndex(selected_index)
+        self.update_review_history_controls()
+
+    def update_review_history_controls(self):
+        is_enabled = (
+            self.preserve_review_history_cb.isChecked()
+            and self.review_history_source_combo.count() > 1
+        )
+        self.review_history_row.setVisible(is_enabled)
+        self.review_history_source_label.setEnabled(is_enabled)
+        self.review_history_source_combo.setEnabled(is_enabled)
+
+    def remember_current_target_selection(self):
+        if not self.active_source_name:
+            return
+
+        target_model_name = self.target_combo.currentData()
+        if target_model_name:
+            self.target_model_names_by_source[self.active_source_name] = target_model_name
+
+    def get_selected_target_model_name(self, source_model_name):
+        selected_target_name = self.target_model_names_by_source.get(source_model_name)
+        if selected_target_name in self.available_model_names:
+            return selected_target_name
+
+        preferred_target_name = state.config["preferred_target_models"].get(
+            source_model_name
+        )
+        if preferred_target_name in self.available_model_names:
+            return preferred_target_name
+
+        return get_default_target_model_name(
+            self.available_model_names,
+            [source_model_name],
+        )
+
+    def set_target_for_source(self, source_model_name):
+        target_model_name = self.get_selected_target_model_name(source_model_name)
+        if not target_model_name:
+            return
+
+        self.target_combo.blockSignals(True)
+        target_index = self.target_combo.findData(target_model_name)
+        if target_index != -1:
+            self.target_combo.setCurrentIndex(target_index)
+        self.target_combo.blockSignals(False)
+
+    def get_saved_mapping_for_pair(self, source_model_name, target_model_name):
+        pair_key = self.get_pair_key(source_model_name, target_model_name)
         if pair_key is None:
             return {}
 
@@ -217,7 +407,6 @@ class ConversionDialog(QDialog):
         if self.has_initial_mapping and pair_key == self.initial_mapping_pair:
             return self.initial_mapping
 
-        source_model_name, target_model_name = pair_key
         map_key = f"{source_model_name}->{target_model_name}"
         try:
             return normalize_field_map(
@@ -225,6 +414,10 @@ class ConversionDialog(QDialog):
             )
         except ValueError:
             return {}
+
+    def get_saved_mapping(self, target_model_name):
+        source_model_name = self.old_model["name"] if self.old_model is not None else None
+        return self.get_saved_mapping_for_pair(source_model_name, target_model_name)
 
     def get_default_sources(self, target_field, saved_mapping):
         if target_field in saved_mapping:
@@ -359,12 +552,15 @@ class ConversionDialog(QDialog):
 
     def on_source_changed(self, source_model_name):
         self.remember_current_mapping()
+        self.remember_current_review_history_card()
+        self.remember_current_target_selection()
         try:
             self.set_source_model(source_model_name)
         except ValueError as exc:
             showInfo(str(exc))
             return
 
+        self.set_target_for_source(source_model_name)
         self.active_source_name = self.old_model["name"]
         self.active_target_name = self.target_combo.currentData()
         self.build_mapping_rows(self.get_saved_mapping(self.active_target_name))
@@ -373,6 +569,8 @@ class ConversionDialog(QDialog):
         self.remember_current_mapping()
         self.active_source_name = self.old_model["name"] if self.old_model else None
         self.active_target_name = target_model_name
+        if self.active_source_name and target_model_name:
+            self.target_model_names_by_source[self.active_source_name] = target_model_name
         self.build_mapping_rows(self.get_saved_mapping(target_model_name))
 
     def get_source_model(self):
@@ -394,21 +592,69 @@ class ConversionDialog(QDialog):
         return mapping
 
     def accept(self):
+        self.remember_current_mapping()
+        self.remember_current_review_history_card()
+        self.remember_current_target_selection()
+
         # Save settings for next time
         state.config["open_notes_after"] = self.open_after_cb.isChecked()
         state.config["delete_original"] = self.delete_original_cb.isChecked()
+        state.config["preserve_review_history"] = (
+            self.preserve_review_history_cb.isChecked()
+        )
         state.config["toggle_strip_cloze"] = self.strip_cloze_cb.isChecked()
         state.config["target_deck_id"] = self.deck_combo.currentData()
+        state.config["review_history_source_card_ord_by_model"] = dict(
+            sorted(self.review_history_card_ords.items())
+        )
         state.save_config()
         super().accept()
 
     def get_settings(self):
+        review_history_source_card_ord = self.review_history_source_combo.currentData()
+        if self.allow_source_selection:
+            review_history_source_card_ord = None
+
         return {
             "open_notes_after": self.open_after_cb.isChecked(),
             "delete_original": self.delete_original_cb.isChecked(),
+            "preserve_review_history": self.preserve_review_history_cb.isChecked(),
+            "review_history_source_card_ord": review_history_source_card_ord,
+            "review_history_source_card_ord_by_model": dict(
+                sorted(self.review_history_card_ords.items())
+            ),
             "toggle_strip_cloze": self.strip_cloze_cb.isChecked(),
             "target_deck_id": self.deck_combo.currentData(),
         }
+
+    def get_conversion_plans(self):
+        self.remember_current_mapping()
+        self.remember_current_target_selection()
+
+        source_model_names = (
+            self.available_source_model_names
+            if self.allow_source_selection
+            else [self.old_model["name"]]
+        )
+        conversion_plans = {}
+        for source_model_name in source_model_names:
+            target_model_name = self.get_selected_target_model_name(source_model_name)
+            if not target_model_name:
+                continue
+
+            target_model = mw.col.models.by_name(target_model_name)
+            if not target_model:
+                continue
+
+            conversion_plans[source_model_name] = {
+                "target_model": target_model,
+                "mapping": self.get_saved_mapping_for_pair(
+                    source_model_name,
+                    target_model_name,
+                ),
+            }
+
+        return conversion_plans
 
     def save_quick_preset(self):
         source_model = self.get_source_model()
@@ -438,15 +684,44 @@ class ConversionDialog(QDialog):
             tooltip(f"Updated quick preset: {preset_name}")
 
 
-def show_conversion_dialog(parent, old_model):
+def show_conversion_dialog(
+    parent,
+    old_model,
+    *,
+    sample_note_ids_by_model=None,
+    initial_review_history_card_ord_by_model=None,
+):
     dialog = ConversionDialog(
         parent,
         old_model,
         initial_target_model_name=get_default_target_model_name(
             mw.col.models.all_names(), [old_model["name"]]
         ),
+        sample_note_ids_by_model=sample_note_ids_by_model,
+        initial_review_history_card_ord_by_model=initial_review_history_card_ord_by_model,
     )
     if not dialog.exec():
         return None, None, None
 
     return dialog.get_target_model(), dialog.get_mapping(), dialog.get_settings()
+
+
+def show_multi_source_conversion_dialog(parent, source_model_names, sample_note_ids_by_model):
+    source_model_names = list(dict.fromkeys(source_model_names))
+    if not source_model_names:
+        return None, None
+
+    dialog = ConversionDialog(
+        parent,
+        None,
+        initial_source_model_name=source_model_names[0],
+        allow_source_selection=True,
+        available_source_model_names=source_model_names,
+        sample_note_ids_by_model=sample_note_ids_by_model,
+        window_title="Convert Notes",
+        title_html="Convert <b>{source}</b> notes",
+    )
+    if not dialog.exec():
+        return None, None
+
+    return dialog.get_conversion_plans(), dialog.get_settings()

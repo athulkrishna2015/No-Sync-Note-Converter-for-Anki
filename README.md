@@ -7,10 +7,12 @@ It bypasses the database schema change by performing a **"Create New → Delete 
 ## Features
 
 * **Zero-Sync Overhead:** Converts notes without triggering a full database upload.
-* **Unified Conversion Dialog:** Target note type selection and field mapping now happen in one window, with dropdown-based field mapping and ordered multi-field merges.
+* **Unified Conversion Dialog:** Target note type selection and field mapping happen in one window, with dropdown-based field mapping and ordered multi-field merges. In the browser, mixed source note types can be configured from one shared conversion dialog.
 * **Smart Settings & Persistence:** New checkboxes to control post-conversion behavior:
     * **Open notes after conversion:** Automatically opens the browser focused on the new notes.
     * **Delete original notes:** Controls whether the source notes are removed (enabled by default for zero-sync).
+    * **Preserve review history:** Copies the selected source card's scheduling state onto the merged card and lets you choose which source card to use.
+    * **Remembered card choice:** The selected history source card is remembered per source note type and reused later, including quick-convert runs.
     * **Remove clozes:** Toggle cloze stripping for non-cloze target types.
     * **Target Deck:** Select a specific deck for the converted notes or keep them in their original deck.
     * Settings are remembered for your next conversion.
@@ -33,9 +35,10 @@ Install via AnkiWeb: [No-Sync Note Converter](https://ankiweb.net/shared/info/41
 
 1. Select the notes you want to convert.
 2. **Right-Click** and select **No-Sync Convert Note Type**, or go to **Notes** > **No-Sync Convert Note Type**.
-3. **Conversion Dialog:** A dialog will appear for each unique source note type selected. Choose the target note type at the top, then map fields with dropdown selectors below. You can add multiple source fields to one target field, and they will be merged in order.
-4. The old notes are deleted, new ones created, and the browser refreshes to show the new notes.
-5. If needed, use **Edit -> Undo** once to restore the original notes/cards.
+3. **Conversion Dialog:** If your selection contains multiple source note types, one shared dialog lets you switch the source note type at the top and configure each one in place. Choose the target note type, then map fields with dropdown selectors below. You can add multiple source fields to one target field, and they will be merged in order.
+4. In the options section, leave **Preserve review history** enabled if you want to copy scheduling to the new card. **Use history from** appears when the current source note actually has multiple cards, and the dropdown shows entries like `Card 1`, `Card 2`, plus the template name when available.
+5. The old notes are deleted, new ones created, and the browser refreshes to show the new notes.
+6. If needed, use **Edit -> Undo** once to restore the original notes/cards.
 
 <img width="863" height="722" alt="Screenshot_20260309_185829" src="https://github.com/user-attachments/assets/cf0c8df3-3738-42a9-bdca-edca7c3b6f33" />
 
@@ -47,6 +50,7 @@ Install via AnkiWeb: [No-Sync Note Converter](https://ankiweb.net/shared/info/41
 3. Click **Save Quick Preset** and give the preset a custom name.
 4. The preset will use the current note type as its fixed source note type.
 5. Reuse it later from **Notes** > **No-Sync Quick Convert** in the browser, or from **No-Sync Quick Convert** in the reviewer context menu. Only presets that match the current source note type are shown.
+6. Browser quick-convert uses your saved review-history preference and the last remembered **Use history from** card for that source note type. Reviewer quick-convert uses the card you are currently reviewing.
 
 Preset customization:
 The preset name, target note type, and field mapping are customizable. The source note type is fixed automatically from the note type you created the preset from.
@@ -64,8 +68,9 @@ The preset name, target note type, and field mapping are customizable. The sourc
 1. While reviewing a card, **Right-Click** (or click the **More** button).
 2. Select **No-Sync Convert Note Type**.
 3. **Conversion Dialog:** Choose the target note type and map the fields in the same window. You can add multiple source fields to one target field, and they will be merged in order.
-4. **Action:** The current card is converted and deleted. Anki will immediately move you to the **Next Card**, and a separate **Browser Window** will open focused on the new card so you can edit it (e.g., to add Cloze deletions).
-5. If you want to revert it, use **Edit -> Undo** once.
+4. In the options section, leave **Preserve review history** enabled if you want to keep scheduling on the new card. If the reviewed note currently has multiple cards, **Use history from** is shown and defaults to the card you are reviewing.
+5. **Action:** The current card is converted and deleted. Anki will immediately move you to the **Next Card**, and a separate **Browser Window** will open focused on the new card so you can edit it (e.g., to add Cloze deletions).
+6. If you want to revert it, use **Edit -> Undo** once.
 
 ## Configuration (`config.json`)
 
@@ -74,6 +79,20 @@ You can customize the default behavior in `config.json`.
 ### Options
 
 * `toggle_strip_cloze`: (`true`/`false`) If true, removes `{{c::}}` syntax when converting *from* a Cloze note type *to* a non-Cloze note type.
+* `preserve_review_history`: (`true`/`false`) If true, the conversion dialog enables review-history preservation by default.
+* `review_history_source_card_ord_by_model`: (`object`) Stores the remembered source-card choice for each source note type. Values are zero-based card ordinals (`0` = Card 1, `1` = Card 2, and so on).
+
+**Option Example:**
+
+```json
+{
+    "toggle_strip_cloze": true,
+    "preserve_review_history": true,
+    "review_history_source_card_ord_by_model": {
+        "Basic (and reversed card)": 1
+    }
+}
+```
 
 ### Mappings (Advanced)
 
@@ -130,7 +149,8 @@ The addon is now split into smaller modules for easier maintenance:
 
 ## ⚠️ Important Limitations
 
-* **Review History Reset:** Because the addon creates a *fresh* note and deletes the old one, **review history (scheduling) for that specific card is lost.** The card becomes "New".
+* **Selected Card Only:** Review history preservation applies to one chosen source card per converted note. If the target note creates multiple cards, the selected card's scheduling is applied to the matching card number when possible, otherwise the first new card is used. If the target note creates only one card, that single card gets the chosen source card's scheduling.
+* **Scheduling, Not Full Review Log:** To keep conversion reliable and undoable in a single step, the addon copies the selected card's scheduling state to the new card, but it does not rewrite old revlog entries onto the new card.
 * **Full Sync vs. Media Sync:** This addon prevents a "Full Database Sync," but if you change media filenames or add images, a media sync will still occur (which is normal and fast).
 * **Stale Presets/Mappings:** If source or target fields are renamed later, the addon will block the conversion and ask you to reopen the conversion dialog and update the mapping.
 
@@ -142,6 +162,19 @@ If you find this add-on useful, please consider supporting its development:
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/D1D01W6NQT)
 
 ## Changelog
+
+### 31-03-2026
+
+* Added a **Preserve review history** toggle to the main conversion dialog, enabled by default.
+* Added a **Use history from** picker that appears when the source note has multiple current cards and shows card numbers in the dropdown, plus the template name when available.
+* Preserved the selected source card's scheduling on the merged card.
+* Remembered the selected history-source card per source note type and reused it for browser quick-convert actions.
+
+### 01-04-2026
+
+* Updated browser batch conversion so mixed source note types can be configured from one shared conversion dialog instead of opening a separate dialog for each source type.
+* Fixed reviewer conversions so multi-card notes default review-history preservation to the currently reviewed card.
+* Restored single-step undo for conversions.
 
 ### 24-03-2026
 

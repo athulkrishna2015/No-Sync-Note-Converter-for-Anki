@@ -47,6 +47,14 @@ class AddonConfigDialog(QDialog):
         self.delete_original_checkbox.setChecked(state.config.get("delete_original", True))
         general_layout.addWidget(self.delete_original_checkbox)
 
+        self.preserve_review_history_checkbox = QCheckBox(
+            "Preserve review history on the merged card by default"
+        )
+        self.preserve_review_history_checkbox.setChecked(
+            state.config.get("preserve_review_history", True)
+        )
+        general_layout.addWidget(self.preserve_review_history_checkbox)
+
         self.strip_cloze_checkbox = QCheckBox(
             "Strip cloze markup when converting from a Cloze note type to a non-Cloze note type"
         )
@@ -473,6 +481,9 @@ class AddonConfigDialog(QDialog):
     def accept(self):
         state.config["open_notes_after"] = self.open_after_checkbox.isChecked()
         state.config["delete_original"] = self.delete_original_checkbox.isChecked()
+        state.config["preserve_review_history"] = (
+            self.preserve_review_history_checkbox.isChecked()
+        )
         state.config["toggle_strip_cloze"] = self.strip_cloze_checkbox.isChecked()
         state.config["target_deck_id"] = self.deck_combo.currentData()
         state.config["quick_convert_presets"] = copy.deepcopy(self.working_presets)
