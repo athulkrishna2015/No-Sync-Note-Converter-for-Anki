@@ -125,7 +125,10 @@ def on_browser_convert(browser):
             finish_browser_conversion(browser, all_created_nids)
         else:
             mw.reset()
-            browser.onSearch(reset=False)
+            if hasattr(browser, "search"):
+                browser.search()
+            else:
+                browser.onSearch(reset=False)
         tooltip(f"Converted {len(all_created_nids)} notes.")
 
 
@@ -214,7 +217,10 @@ def on_browser_quick_convert(browser, source_model_name, target_model_name, pres
             finish_browser_conversion(browser, created_nids)
         else:
             mw.reset()
-            browser.onSearch(reset=False)
+            if hasattr(browser, "search"):
+                browser.search()
+            else:
+                browser.onSearch(reset=False)
         
         message = (
             f"Converted {len(created_nids)} notes with preset "

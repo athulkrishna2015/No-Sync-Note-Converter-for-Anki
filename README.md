@@ -162,6 +162,13 @@ If you find this add-on useful, please consider supporting its development:
 
 ## Changelog
 
+### 01-04-2026
+
+* Fixed a crash in newer Anki versions where the Browser `onSearch` method was renamed to `search`.
+* Updated browser batch conversion so mixed source note types can be configured from one shared conversion dialog instead of opening a separate dialog for each source type.
+* Fixed reviewer conversions so multi-card notes default review-history preservation to the currently reviewed card.
+* Restored single-step undo for conversions.
+
 ### 31-03-2026
 
 * Added a **Preserve review history** toggle to the main conversion dialog, enabled by default.
@@ -169,11 +176,6 @@ If you find this add-on useful, please consider supporting its development:
 * Preserved the selected source card's scheduling on the merged card.
 * Remembered the selected history-source card per source note type and reused it for browser quick-convert actions.
 
-### 01-04-2026
-
-* Updated browser batch conversion so mixed source note types can be configured from one shared conversion dialog instead of opening a separate dialog for each source type.
-* Fixed reviewer conversions so multi-card notes default review-history preservation to the currently reviewed card.
-* Restored single-step undo for conversions.
 
 ### 24-03-2026
 
