@@ -173,6 +173,13 @@ def core_convert_logic(nids, target_model, override_mapping=None, override_setti
                 mw.col.add_note(new_note, deck_id=deck_id)
                 pending_nids.append(new_note.id)
 
+                if not settings.get("target_deck_id") and old_cards:
+                    for target_card in new_note.cards():
+                        source_card = _get_card_by_ord(old_cards, target_card.ord) or old_cards[0]
+                        if source_card.did != target_card.did:
+                            target_card.did = source_card.did
+                            mw.col.update_card(target_card)
+
                 if settings.get("preserve_review_history", True):
                     _preserve_review_history(
                         old_cards,

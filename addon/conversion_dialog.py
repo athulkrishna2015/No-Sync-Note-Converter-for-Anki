@@ -150,6 +150,12 @@ class ConversionDialog(QDialog):
         deck_row.addWidget(QLabel("Target deck"))
         self.deck_combo = QComboBox()
         deck_row.addWidget(self.deck_combo, 1)
+        
+        self.use_source_deck_btn = QPushButton("Use source deck as target deck")
+        self.use_source_deck_btn.clicked.connect(lambda: self.deck_combo.setCurrentIndex(0))
+        self.use_source_deck_btn.setToolTip("Set target deck back to 'Same as original'")
+        deck_row.addWidget(self.use_source_deck_btn)
+        
         layout.addLayout(deck_row)
 
         options_group = QGroupBox("Options")

@@ -14,7 +14,7 @@ It bypasses the database schema change by performing a **"Create New → Delete 
     * **Preserve review history:** Copies the selected source card's scheduling state onto the merged card and lets you choose which source card to use.
     * **Remembered card choice:** The selected history source card is remembered per source note type and reused later, including quick-convert runs.
     * **Remove clozes:** Toggle cloze stripping for non-cloze target types.
-    * **Target Deck:** Select a specific deck for the converted notes or keep them in their original deck.
+    * **Target Deck:** Select a specific deck for the converted notes, or click the **Use source deck as target deck** button to keep each converted card individually in its exact original subdeck/deck.
     * Settings are remembered for your next conversion.
 * **Quick Convert Presets:** Save named source-to-target conversion presets from the dialog and reuse them from one-click quick convert menus that only appear for matching source note types.
 * **Single-Step Undo:** Each conversion is merged into one Anki undo action, so **Edit -> Undo** restores the previous note/card state in a single step.
@@ -161,6 +161,11 @@ If you find this add-on useful, please consider supporting its development:
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/D1D01W6NQT)
 
 ## Changelog
+
+### 02-04-2026
+
+* Added a **Use source deck as target deck** button in the main conversion dialog to quickly reset the destination to "Same as original".
+* Updated the conversion logic so that when "Same as original" is selected, each newly created card is placed in the exact subdeck/deck of its corresponding original card, instead of grouping them all into a single deck.
 
 ### 01-04-2026
 
