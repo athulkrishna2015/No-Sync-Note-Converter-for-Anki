@@ -2,7 +2,7 @@ from anki.consts import MODEL_CLOZE
 from aqt import mw
 from aqt.utils import showInfo
 
-from . import state
+from . import logger, state
 from .mapping import get_effective_field_map, strip_cloze_tags
 
 
@@ -91,7 +91,15 @@ def _preserve_review_history(old_cards, new_note, preferred_source_ord, delete_o
         target_card = _get_card_by_ord(target_cards, source_card.ord) or target_cards[0]
         _copy_card_scheduling(source_card, target_card)
         mw.col.update_card(target_card)
-    except Exception:
+        logger.debug(
+            "Preserved review history: source ord=%s (cid=%s) -> target ord=%s (cid=%s)",
+            source_card.ord,
+            source_card.id,
+            target_card.ord,
+            target_card.id,
+        )
+    except Exception as e:
+        logger.warning(f"_preserve_review_history failed: {e}", exc_info=True)
         # Review-history transfer is best-effort and should not abort conversion.
         return
 
@@ -102,11 +110,20 @@ def core_convert_logic(nids, target_model, override_mapping=None, override_setti
     Returns a list of new Note IDs.
     """
     if not nids:
+        logger.debug("core_convert_logic: no nids")
         return []
 
     settings = state.config.copy()
     if override_settings:
         settings.update(override_settings)
+
+    logger.info(
+        "core_convert_logic start: %d notes -> %s mapping=%s settings=%s",
+        len(nids),
+        target_model["name"],
+        override_mapping,
+        override_settings,
+    )
 
     mw.progress.start()
 
@@ -200,6 +217,7 @@ def core_convert_logic(nids, target_model, override_mapping=None, override_setti
         mw.col.merge_undo_entries(undo_entry)
 
     except Exception as e:
+        logger.error(f"core_convert_logic failed: {e}", exc_info=True)
         showInfo(
             f"Error during conversion from note(s) to '{target_model_name}': {str(e)}\n\n"
             "No notes were converted."
@@ -208,4 +226,5 @@ def core_convert_logic(nids, target_model, override_mapping=None, override_setti
     finally:
         mw.progress.finish()
 
+    logger.info("core_convert_logic success: created %d notes -> %s", len(created_nids), created_nids)
     return created_nids

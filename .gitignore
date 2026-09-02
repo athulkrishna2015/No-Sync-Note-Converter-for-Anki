@@ -146,3 +146,6 @@ cython_debug/
 # Anki packages
 *.ankiaddon
 .codex
+# Debug logs (rotated)
+debug.log*
+addon/debug.log*

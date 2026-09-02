@@ -6,10 +6,13 @@ from aqt.gui_hooks import (
     reviewer_will_show_context_menu,
 )
 
+from . import logger
 from .browser_actions import setup_browser_context_menu, setup_browser_menu
 from .config_dialog import open_config_gui, register_tools_config_action
 from .reviewer_actions import setup_reviewer_menu
 from .state import reload_config
+
+logger.info("Addon loaded: No-Sync Note Converter")
 
 addHook("browser.setupMenus", setup_browser_menu)
 browser_will_show_context_menu.append(setup_browser_context_menu)

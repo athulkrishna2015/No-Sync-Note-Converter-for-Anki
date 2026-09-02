@@ -2,7 +2,7 @@ from aqt import mw
 from aqt.qt import QAction, QMenu
 from aqt.utils import showInfo, tooltip
 
-from . import state
+from . import logger, state
 from .conversion_dialog import (
     show_conversion_dialog,
     show_multi_source_conversion_dialog,
@@ -47,6 +47,7 @@ def _get_sample_note_ids_by_model(notes_by_mid):
 
 def on_browser_convert(browser):
     nids = browser.selectedNotes()
+    logger.info("on_browser_convert: selected %d notes", len(nids) if nids else 0)
     if not nids:
         tooltip("No notes selected.")
         return
@@ -120,6 +121,7 @@ def on_browser_convert(browser):
             )
             all_created_nids.extend(created_nids)
 
+    logger.info("on_browser_convert finished: created %d notes %s", len(all_created_nids), all_created_nids)
     if all_created_nids:
         if open_after:
             finish_browser_conversion(browser, all_created_nids)
@@ -173,8 +175,15 @@ def populate_browser_quick_convert_menu(browser, menu):
 
 
 def on_browser_quick_convert(browser, source_model_name, target_model_name, preset_name):
+    logger.info(
+        "on_browser_quick_convert: %s -> %s preset=%s",
+        source_model_name,
+        target_model_name,
+        preset_name,
+    )
     preset = get_quick_convert_preset(source_model_name, target_model_name, preset_name)
     if not preset:
+        logger.warning("Quick convert preset not found: %s", preset_name)
         tooltip("Quick convert preset not found.")
         return
 

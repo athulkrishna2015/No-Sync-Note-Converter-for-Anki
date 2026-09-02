@@ -2,7 +2,7 @@ from aqt import mw
 from aqt.qt import *
 from aqt.utils import showInfo, tooltip
 
-from . import state
+from . import logger, state
 from .mapping import (
     get_default_target_model_name,
     normalize_field_map,
@@ -557,12 +557,14 @@ class ConversionDialog(QDialog):
             row["remove_button"].setEnabled(can_remove)
 
     def on_source_changed(self, source_model_name):
+        logger.debug("ConversionDialog on_source_changed: %s", source_model_name)
         self.remember_current_mapping()
         self.remember_current_review_history_card()
         self.remember_current_target_selection()
         try:
             self.set_source_model(source_model_name)
         except ValueError as exc:
+            logger.error(f"on_source_changed failed: {exc}", exc_info=True)
             showInfo(str(exc))
             return
 
@@ -614,6 +616,13 @@ class ConversionDialog(QDialog):
             sorted(self.review_history_card_ords.items())
         )
         state.save_config()
+        logger.info(
+            "ConversionDialog accepted: source=%s target=%s mapping=%s settings=%s",
+            self.old_model["name"] if self.old_model else "?",
+            self.get_target_model()["name"] if self.get_target_model() else "?",
+            self.get_mapping(),
+            self.get_settings(),
+        )
         super().accept()
 
     def get_settings(self):

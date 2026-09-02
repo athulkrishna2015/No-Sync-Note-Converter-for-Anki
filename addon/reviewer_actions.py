@@ -1,7 +1,7 @@
 from aqt import dialogs, mw
 from aqt.utils import showInfo, tooltip
 
-from . import state
+from . import logger, state
 from .conversion_dialog import show_conversion_dialog
 from .mapping import (
     format_quick_preset_label,
@@ -14,7 +14,9 @@ from .operations import core_convert_logic
 
 def on_reviewer_convert(reviewer):
     card = reviewer.card
+    logger.info("on_reviewer_convert: card=%s", getattr(card, "id", None) if card else None)
     if not card:
+        logger.warning("on_reviewer_convert: no card")
         return
 
     old_note = card.note()
@@ -38,19 +40,29 @@ def on_reviewer_convert(reviewer):
     )
 
     if created_nids:
+        logger.info("on_reviewer_convert success: created %s", created_nids)
         reviewer.nextCard()
         mw.reset()
 
         if settings.get("open_notes_after"):
             query = f"nid:{created_nids[0]}"
             dialogs.open("Browser", mw, search=[query])
+    else:
+        logger.debug("on_reviewer_convert: no notes created")
 
 
 def on_reviewer_quick_convert(
     reviewer, source_model_name, target_model_name, preset_name
 ):
+    logger.info(
+        "on_reviewer_quick_convert: %s -> %s preset=%s",
+        source_model_name,
+        target_model_name,
+        preset_name,
+    )
     preset = get_quick_convert_preset(source_model_name, target_model_name, preset_name)
     if not preset:
+        logger.warning("Quick convert preset not found: %s", preset_name)
         tooltip("Quick convert preset not found.")
         return
 
