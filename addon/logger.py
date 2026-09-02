@@ -131,5 +131,32 @@ def clear_log():
         return False
 
 
+def clear_log_on_startup():
+    """Clear log file on Anki start (silent, no 'cleared by user' entry)."""
+    try:
+        if _logger:
+            for h in list(_logger.handlers):
+                try:
+                    h.flush()
+                except Exception:
+                    pass
+        if LOG_FILE.exists():
+            # Truncate to avoid handler file descriptor issues; keep handler open
+            # Reopen file via handler if needed - simplest is to write empty content
+            try:
+                LOG_FILE.write_text("", encoding="utf-8")
+            except Exception:
+                # Fallback: open and truncate
+                with LOG_FILE.open("w", encoding="utf-8"):
+                    pass
+        return True
+    except Exception as e:
+        try:
+            error(f"Failed to clear log on startup: {e}", exc_info=True)
+        except Exception:
+            pass
+        return False
+
+
 # Log addon load once
 info("Logger initialized - %s", datetime.now().isoformat())

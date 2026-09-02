@@ -4,8 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
-SHORT_VERSION_RE = re.compile(r"^\d+\.\d+$")
+VERSION_RE = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
 BUMP_PART_ALIASES = {
     "major": "major",
     "minor": "minor",
@@ -15,17 +14,14 @@ BUMP_PART_ALIASES = {
 
 
 def normalize_version(version_string: str) -> str:
-    version = (version_string or "").strip()
-    if SHORT_VERSION_RE.fullmatch(version):
-        return f"{version}.0"
-    return version
+    return (version_string or "").strip()
 
 
 def validate_version(version_string: str) -> str:
     normalized = normalize_version(version_string)
     if not VERSION_RE.fullmatch(normalized):
         raise ValueError(
-            f"Invalid version '{version_string}'. Expected format: major.minor.patch"
+            f"Invalid version '{version_string}'. Expected format: major.minor[.patch]"
         )
     return normalized
 
@@ -50,37 +46,43 @@ def sync_version(version_string: str, addon_root: Path) -> None:
 
 def normalize_bump_part(part: str) -> str:
     normalized = (part or "").strip().lower()
+    if VERSION_RE.fullmatch(normalized):
+        return normalized
     mapped = BUMP_PART_ALIASES.get(normalized)
     if not mapped:
         valid = ", ".join(sorted(k for k in BUMP_PART_ALIASES if k != "path"))
-        raise ValueError(f"Invalid bump part '{part}'. Expected one of: {valid}")
+        raise ValueError(f"Invalid bump part '{part}'. Expected one of: {valid} or explicitly major.minor[.patch]")
     return mapped
 
 def increment_version(version_string: str, bump_part: str = "patch") -> str:
+    part = normalize_bump_part(bump_part)
+    if VERSION_RE.fullmatch(part):
+        return part
+    parts = version_string.split(".")
     try:
-        major, minor, patch = map(int, version_string.split("."))
-    except ValueError as e:
+        major = int(parts[0])
+        minor = int(parts[1])
+        patch = int(parts[2]) if len(parts) > 2 else None
+    except (ValueError, IndexError) as e:
         raise ValueError(
-            f"Invalid version '{version_string}'. Expected major.minor.patch"
+            f"Invalid version '{version_string}'. Expected major.minor[.patch]"
         ) from e
 
     part = normalize_bump_part(bump_part)
     if part == "major":
         major += 1
-        minor = 0
-        patch = 0
+        return f"{major}.0"
     elif part == "minor":
         minor += 1
-        patch = 0
+        return f"{major}.{minor}"
     else:
-        patch += 1
-
-    return f"{major}.{minor}.{patch}"
+        patch = (patch or 0) + 1
+        return f"{major}.{minor}.{patch}"
 
 def increment_patch(version_string: str) -> str:
     return increment_version(version_string, "patch")
 
-def read_current_version(addon_dir: Path, default: str | None = None) -> str:
+def read_current_version(addon_dir: Path) -> str:
     version_file = addon_dir / "VERSION"
     if version_file.exists():
         version = version_file.read_text(encoding="utf-8").strip()
@@ -97,9 +99,6 @@ def read_current_version(addon_dir: Path, default: str | None = None) -> str:
                 except ValueError:
                     continue
 
-    if default is not None:
-        return validate_version(default)
-
     raise FileNotFoundError(
         f"Could not determine current version from {version_file} or {manifest_file}"
     )
@@ -107,7 +106,7 @@ def read_current_version(addon_dir: Path, default: str | None = None) -> str:
 def bump_version(addon_dir: Path = Path("addon"), bump_part: str = "patch") -> int:
     try:
         part = normalize_bump_part(bump_part)
-        current_version = read_current_version(addon_dir, default="0.1.0")
+        current_version = read_current_version(addon_dir)
         new_version = increment_version(current_version, part)
         print(f"Bumping {part} version: {current_version} → {new_version}")
         sync_version(new_version, addon_dir)
@@ -132,22 +131,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default="addon",
         help="Path to the addon directory (default: addon).",
     )
-    parser.add_argument(
-        "--current",
-        action="store_true",
-        help="Print current version and exit.",
-    )
     return parser.parse_args(argv[1:])
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
-    if args.current:
-        try:
-            print(read_current_version(Path(args.addon_dir)))
-            return 0
-        except Exception as e:
-            print(f"Error reading version: {e}")
-            return 1
     return bump_version(Path(args.addon_dir), args.part)
 
 if __name__ == "__main__":

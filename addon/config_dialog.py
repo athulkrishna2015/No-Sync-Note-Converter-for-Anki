@@ -9,12 +9,12 @@ from .config_tabs.general import GeneralTab
 from .config_tabs.log import LogTab
 from .config_tabs.mappings import MappingsTab
 from .config_tabs.presets import PresetsTab
-from .config_tabs.support import SupportTab
+from .config_tabs.tab_support import SupportTabMixin
 from .conversion_dialog import ConversionDialog
 
 
-class AddonConfigDialog(QDialog):
-    def __init__(self, parent):
+class AddonConfigDialog(QDialog, SupportTabMixin):
+    def __init__(self, parent, initial_tab=None):
         super().__init__(parent)
         self.working_toggle_strip_cloze = bool(
             state.config.get("toggle_strip_cloze", True)
@@ -23,36 +23,44 @@ class AddonConfigDialog(QDialog):
             state.config.get("quick_convert_presets", [])
         )
         self.working_mappings = copy.deepcopy(state.config.get("mappings", {}))
+        self._initial_tab = initial_tab
 
         self.setWindowTitle(f"{state.ADDON_NAME} Config")
         self.setMinimumWidth(780)
         self.setMinimumHeight(560)
         self.setup_ui()
-        logger.info("Config dialog opened")
+        logger.info("Config dialog opened (initial_tab=%s)", initial_tab)
 
     def setup_ui(self):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        tabs = QTabWidget()
-        layout.addWidget(tabs)
+        self.tabs = QTabWidget()
+        layout.addWidget(self.tabs)
 
         self.general_tab = GeneralTab(
             self, working_toggle_strip_cloze=self.working_toggle_strip_cloze
         )
-        tabs.addTab(self.general_tab, "General")
+        self.tabs.addTab(self.general_tab, "General")
 
         self.presets_tab = PresetsTab(self)
-        tabs.addTab(self.presets_tab, "Quick Presets")
+        self.tabs.addTab(self.presets_tab, "Quick Presets")
 
         self.mappings_tab = MappingsTab(self)
-        tabs.addTab(self.mappings_tab, "Mappings")
+        self.tabs.addTab(self.mappings_tab, "Mappings")
 
-        self.support_tab = SupportTab(self)
-        tabs.addTab(self.support_tab, "Support")
+        # Support tab via mixin (creates self.support_tab and self.supporter_check)
+        self._create_support_tab()
+        self.tabs.addTab(self.support_tab, "Support")
 
         self.log_tab = LogTab(self)
-        tabs.addTab(self.log_tab, "Logs")
+        self.tabs.addTab(self.log_tab, "Logs")
+
+        # Handle initial tab selection
+        if self._initial_tab == "support":
+            self.tabs.setCurrentWidget(self.support_tab)
+        elif self._initial_tab == "logs":
+            self.tabs.setCurrentWidget(self.log_tab)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -140,9 +148,11 @@ class AddonConfigDialog(QDialog):
         super().accept()
 
 
-def open_config_gui(*_args, **_kwargs):
-    logger.info("open_config_gui triggered")
-    dialog = AddonConfigDialog(mw)
+def open_config_gui(*_args, initial_tab=None, **_kwargs):
+    # Allow initial_tab via kwargs or via mw.addonManager dialog trigger (Anki calls with no args)
+    # Support both open_config_gui(initial_tab="support") and plain call
+    logger.info("open_config_gui triggered (initial_tab=%s)", initial_tab)
+    dialog = AddonConfigDialog(mw, initial_tab=initial_tab)
     dialog.exec()
     return True
 
